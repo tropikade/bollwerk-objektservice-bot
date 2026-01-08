@@ -1,20 +1,22 @@
 import os
-from datetime import datetime
 import sqlite3
+from datetime import datetime
+
 from aiogram import Bot, Dispatcher, executor, types
 from dotenv import load_dotenv
 
-# ================= Load Token =================
+# ================== ENV ==================
 load_dotenv()
 BOT_TOKEN = os.getenv("8542702168:AAFOPofmRm3R7MLFRTfGxmGL_5YV6Fvhk4I")
 
 if not BOT_TOKEN:
-    raise Exception("Ошибка: BOT_TOKEN не найден в .env")
+    raise Exception("8542702168:AAFOPofmRm3R7MLFRTfGxmGL_5YV6Fvhk4I")
 
-bot = Bot(token=8542702168:AAFOPofmRm3R7MLFRTfGxmGL_5YV6Fvhk4I)
+# ================== BOT ==================
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
 
-# ================= Database =================
+# ================== DATABASE ==================
 conn = sqlite3.connect("worktime.db")
 cursor = conn.cursor()
 
@@ -41,7 +43,8 @@ CREATE TABLE IF NOT EXISTS worktime (
 """)
 
 conn.commit()
-# ================= Keyboards =================
+
+# ================== KEYBOARDS ==================
 def main_keyboard():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.add("🟢 Anmeldung", "🔴 Abmeldung")
@@ -52,7 +55,7 @@ def location_keyboard():
     kb.add(types.KeyboardButton("📍 Standort senden", request_location=True))
     return kb
 
-# ================= Start =================
+# ================== START ==================
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
     cursor.execute("SELECT * FROM users WHERE user_id = ?", (message.from_user.id,))
@@ -64,27 +67,37 @@ async def start(message: types.Message):
             reply_markup=main_keyboard()
         )
     else:
-        await message.answer("Willkommen! Bitte geben Sie Ihren Vornamen ein:")
-
-# ================= Registration =================
-@dp.message_handler(lambda m: m.text and not m.text.startswith("/"))
-async def registration(message: types.Message):
-    cursor.execute("SELECT * FROM users WHERE user_id = ?", (message.from_user.id,))
-    user = cursor.fetchone()
-
-    if not user:
         cursor.execute(
-            "INSERT INTO users (user_id, vorname) VALUES (?, ?)",
-            (message.from_user.id, message.text)
+            "INSERT INTO users (user_id) VALUES (?)",
+            (message.from_user.id,)
         )
         conn.commit()
-        await message.answer("Danke. Bitte geben Sie jetzt Ihren Nachnamen ein:")
+        await message.answer("Bitte geben Sie Ihren Vornamen ein:")
+
+# ================== REGISTRATION ==================
+@dp.message_handler(lambda m: m.text and not m.text.startswith("/"))
+async def registration(message: types.Message):
+    user_id = message.from_user.id
+
+    cursor.execute(
+        "SELECT vorname, nachname FROM users WHERE user_id = ?",
+        (user_id,)
+    )
+    user = cursor.fetchone()
+
+    if user and not user[0]:
+        cursor.execute(
+            "UPDATE users SET vorname = ? WHERE user_id = ?",
+            (message.text, user_id)
+        )
+        conn.commit()
+        await message.answer("Bitte geben Sie Ihren Nachnamen ein:")
         return
 
-    if user and user[2] is None:
+    if user and user[0] and not user[1]:
         cursor.execute(
             "UPDATE users SET nachname = ? WHERE user_id = ?",
-            (message.text, message.from_user.id)
+            (message.text, user_id)
         )
         conn.commit()
         await message.answer(
@@ -92,66 +105,97 @@ async def registration(message: types.Message):
             reply_markup=main_keyboard()
         )
 
-# ================= Actions =================
+# ================== BUTTONS ==================
 @dp.message_handler(lambda m: m.text in ["🟢 Anmeldung", "🔴 Abmeldung"])
 async def action(message: types.Message):
-    cursor.execute("SELECT * FROM users WHERE user_id = ?", (message.from_user.id,))
-    user = cursor.fetchone()
+    user_id = message.from_user.id
 
-    if not user or not user[2]:
-        await message.answer("Bitte registrieren Sie sich zuerst mit Vor- und Nachnamen.")
-        return
+    cursor.execute("""
+    SELECT id FROM worktime
+    WHERE user_id = ? AND end_time IS NULL
+    """, (user_id,))
+    active_shift = cursor.fetchone()
 
-    await message.answer(
-        "Bitte senden Sie Ihren Standort.",
-        reply_markup=location_keyboard()
-    )
-    dp.current_action = message.text
+    if message.text == "🟢 Anmeldung":
+        if active_shift:
+            await message.answer("❌ Sie haben bereits eine aktive Schicht.")
+            return
 
-# ================= Location =================
+        cursor.execute(
+            "UPDATE users SET current_action = 'ANMELDUNG' WHERE user_id = ?",
+            (user_id,)
+        )
+        conn.commit()
+
+        await message.answer(
+            "Bitte senden Sie Ihren Standort zum Arbeitsbeginn.",
+            reply_markup=location_keyboard()
+        )
+
+    elif message.text == "🔴 Abmeldung":
+        if not active_shift:
+            await message.answer("❌ Keine aktive Schicht gefunden.")
+            return
+
+        cursor.execute(
+            "UPDATE users SET current_action = 'ABMELDUNG' WHERE user_id = ?",
+            (user_id,)
+        )
+        conn.commit()
+
+        await message.answer(
+            "Bitte senden Sie Ihren Standort zum Arbeitsende.",
+            reply_markup=location_keyboard()
+        )
+
+# ================== LOCATION ==================
 @dp.message_handler(content_types=types.ContentType.LOCATION)
 async def location_handler(message: types.Message):
-    action = dp.current_action
+    user_id = message.from_user.id
+
+    cursor.execute(
+        "SELECT current_action FROM users WHERE user_id = ?",
+        (user_id,)
+    )
+    row = cursor.fetchone()
+
+    if not row or not row[0]:
+        await message.answer("❌ Bitte wählen Sie zuerst eine Aktion.")
+        return
+
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    if action == "🟢 Anmeldung":
+    if row[0] == "ANMELDUNG":
         cursor.execute("""
         INSERT INTO worktime (user_id, start_time, start_lat, start_lon)
         VALUES (?, ?, ?, ?)
         """, (
-            message.from_user.id,
+            user_id,
             now,
             message.location.latitude,
             message.location.longitude
         ))
-        conn.commit()
-        await message.answer("✅ Anmeldung erfolgreich.", reply_markup=main_keyboard())
 
-    elif action == "🔴 Abmeldung":
-        cursor.execute("""
-        SELECT id FROM worktime
-        WHERE user_id = ? AND end_time IS NULL
-        ORDER BY id DESC LIMIT 1
-        """, (message.from_user.id,))
-        row = cursor.fetchone()
-
-        if not row:
-            await message.answer("❌ Keine aktive Anmeldung gefunden.")
-            return
-
+    elif row[0] == "ABMELDUNG":
         cursor.execute("""
         UPDATE worktime
         SET end_time = ?, end_lat = ?, end_lon = ?
-        WHERE id = ?
+        WHERE user_id = ? AND end_time IS NULL
         """, (
             now,
             message.location.latitude,
             message.location.longitude,
-            row[0]
+            user_id
         ))
-        conn.commit()
-        await message.answer("✅ Abmeldung erfolgreich.", reply_markup=main_keyboard())
 
-# ================= Run =================
+    cursor.execute(
+        "UPDATE users SET current_action = NULL WHERE user_id = ?",
+        (user_id,)
+    )
+    conn.commit()
+
+    await message.answer("✅ Aktion erfolgreich.", reply_markup=main_keyboard())
+
+# ================== RUN ==================
 if __name__ == "__main__":
     executor.start_polling(dp)
