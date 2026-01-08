@@ -11,7 +11,7 @@ BOT_TOKEN = os.getenv("8542702168:AAFOPofmRm3R7MLFRTfGxmGL_5YV6Fvhk4I")
 if not BOT_TOKEN:
     raise Exception("Ошибка: BOT_TOKEN не найден в .env")
 
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(token=8542702168:AAFOPofmRm3R7MLFRTfGxmGL_5YV6Fvhk4I)
 dp = Dispatcher(bot)
 
 # ================= Database =================
