@@ -16,6 +16,10 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
 
 # ================== DATABASE ==================
+# ================== DATABASE ==================
+import sqlite3
+
+# ================== DATABASE ==================
 conn = sqlite3.connect("worktime.db")
 cursor = conn.cursor()
 
