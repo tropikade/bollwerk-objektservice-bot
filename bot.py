@@ -22,7 +22,8 @@ cursor.execute("""
 CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY,
     vorname TEXT,
-    nachname TEXT
+    nachname TEXT,
+    current_action TEXT
 )
 """)
 
@@ -40,7 +41,6 @@ CREATE TABLE IF NOT EXISTS worktime (
 """)
 
 conn.commit()
-
 # ================= Keyboards =================
 def main_keyboard():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -155,30 +155,3 @@ async def location_handler(message: types.Message):
 # ================= Run =================
 if __name__ == "__main__":
     executor.start_polling(dp)
-
-conn = sqlite3.connect("worktime.db")
-cursor = conn.cursor()
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    user_id INTEGER PRIMARY KEY,
-    vorname TEXT,
-    nachname TEXT,
-    current_action TEXT
-)
-""")
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS worktime (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    start_time TEXT,
-    start_lat REAL,
-    start_lon REAL,
-    end_time TEXT,
-    end_lat REAL,
-    end_lon REAL
-)
-""")
-
-conn.commit()
