@@ -1,17 +1,20 @@
 import os
-import sqlite3
 from datetime import datetime
-
+import sqlite3
 from aiogram import Bot, Dispatcher, executor, types
 from dotenv import load_dotenv
 
+# ================= Load Token =================
 load_dotenv()
-BOT_TOKEN = os.getenv("")
+BOT_TOKEN = os.getenv("8542702168:AAFOPofmRm3R7MLFRTfGxmGL_5YV6Fvhk4I")
+
+if not BOT_TOKEN:
+    raise Exception("Ошибка: BOT_TOKEN не найден в .env")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
 
-# ================= DATABASE =================
+# ================= Database =================
 conn = sqlite3.connect("worktime.db")
 cursor = conn.cursor()
 
@@ -38,7 +41,7 @@ CREATE TABLE IF NOT EXISTS worktime (
 
 conn.commit()
 
-# ================= KEYBOARDS =================
+# ================= Keyboards =================
 def main_keyboard():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.add("🟢 Anmeldung", "🔴 Abmeldung")
@@ -49,7 +52,7 @@ def location_keyboard():
     kb.add(types.KeyboardButton("📍 Standort senden", request_location=True))
     return kb
 
-# ================= START =================
+# ================= Start =================
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
     cursor.execute("SELECT * FROM users WHERE user_id = ?", (message.from_user.id,))
@@ -63,7 +66,7 @@ async def start(message: types.Message):
     else:
         await message.answer("Willkommen! Bitte geben Sie Ihren Vornamen ein:")
 
-# ================= REGISTRATION =================
+# ================= Registration =================
 @dp.message_handler(lambda m: m.text and not m.text.startswith("/"))
 async def registration(message: types.Message):
     cursor.execute("SELECT * FROM users WHERE user_id = ?", (message.from_user.id,))
@@ -71,7 +74,7 @@ async def registration(message: types.Message):
 
     if not user:
         cursor.execute(
-            "INSERT OR IGNORE INTO users (user_id, vorname) VALUES (?, ?)",
+            "INSERT INTO users (user_id, vorname) VALUES (?, ?)",
             (message.from_user.id, message.text)
         )
         conn.commit()
@@ -89,7 +92,7 @@ async def registration(message: types.Message):
             reply_markup=main_keyboard()
         )
 
-# ================= ACTIONS =================
+# ================= Actions =================
 @dp.message_handler(lambda m: m.text in ["🟢 Anmeldung", "🔴 Abmeldung"])
 async def action(message: types.Message):
     cursor.execute("SELECT * FROM users WHERE user_id = ?", (message.from_user.id,))
@@ -105,7 +108,7 @@ async def action(message: types.Message):
     )
     dp.current_action = message.text
 
-# ================= LOCATION =================
+# ================= Location =================
 @dp.message_handler(content_types=types.ContentType.LOCATION)
 async def location_handler(message: types.Message):
     action = dp.current_action
@@ -149,6 +152,7 @@ async def location_handler(message: types.Message):
         conn.commit()
         await message.answer("✅ Abmeldung erfolgreich.", reply_markup=main_keyboard())
 
-# ================= RUN =================
+# ================= Run =================
 if __name__ == "__main__":
     executor.start_polling(dp)
+
