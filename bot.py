@@ -10,7 +10,8 @@ load_dotenv()
 BOT_TOKEN = os.getenv("8542702168:AAFOPofmRm3R7MLFRTfGxmGL_5YV6Fvhk4I")
 
 if not BOT_TOKEN:
-    raise Exception("8542702168:AAFOPofmRm3R7MLFRTfGxmGL_5YV6Fvhk4I")
+    raise Exception("BOT_TOKEN nicht gefunden. Prüfen Sie die .env Datei.")
+
 
 # ================== BOT ==================
 bot = Bot(token=BOT_TOKEN)
