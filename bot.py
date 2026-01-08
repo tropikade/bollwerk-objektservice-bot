@@ -16,25 +16,29 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
 
 # ================== DATABASE ==================
-# ================== DATABASE ==================
-import sqlite3
-
-# ================== DATABASE ==================
 conn = sqlite3.connect("worktime.db")
 cursor = conn.cursor()
 
-# Таблица пользователей
+# Создаем таблицу users, если её нет
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY,
     vorname TEXT,
-    nachname TEXT,
-    language TEXT,
-    current_action TEXT
+    nachname TEXT
 )
 """)
 
-# Таблица рабочих смен
+# Проверяем наличие колонок и добавляем, если нет
+def add_column_if_not_exists(table, column, col_type):
+    cursor.execute(f"PRAGMA table_info({table})")
+    columns = [info[1] for info in cursor.fetchall()]
+    if column not in columns:
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+
+add_column_if_not_exists("users", "language", "TEXT")
+add_column_if_not_exists("users", "current_action", "TEXT")
+
+# Таблица worktime
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS worktime (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,6 +51,7 @@ CREATE TABLE IF NOT EXISTS worktime (
     end_lon REAL
 )
 """)
+
 conn.commit()
 
 # ================== MESSAGES ==================
@@ -137,8 +142,8 @@ async def start(message: types.Message):
     cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
     user = cursor.fetchone()
 
-    if user:
-        lang = user[3] if user[3] else "de"
+    if user and user[1] and user[2] and user[3]:
+        lang = user[3]
         await message.answer(MESSAGES["welcome_back"][lang], reply_markup=main_keyboard())
     else:
         await message.answer(MESSAGES["choose_language"]["de"], reply_markup=language_keyboard())
@@ -181,7 +186,8 @@ async def registration(message: types.Message):
 async def buttons(message: types.Message):
     user_id = message.from_user.id
     cursor.execute("SELECT language FROM users WHERE user_id = ?", (user_id,))
-    lang = cursor.fetchone()[0] if cursor.fetchone() else "de"
+    lang_row = cursor.fetchone()
+    lang = lang_row[0] if lang_row else "de"
 
     cursor.execute("""
     SELECT id FROM worktime
@@ -239,7 +245,6 @@ async def location_handler(message: types.Message):
 
 # ================== REPORT GENERATION ==================
 async def generate_report(message, lang="de"):
-    # Берём текущий месяц
     month_str = datetime.now().strftime("%Y-%m")
     df = pd.read_sql_query(f"""
     SELECT u.vorname, u.nachname, w.start_time, w.start_lat, w.start_lon,
