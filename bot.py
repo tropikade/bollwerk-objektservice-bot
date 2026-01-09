@@ -3,7 +3,9 @@ import sqlite3
 from datetime import datetime
 from telegram import ReplyKeyboardMarkup, KeyboardButton, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from database import init_db
 
+init_db()
 # ====== Настройки ======
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
