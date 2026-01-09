@@ -18,6 +18,16 @@ def start(update, context):
         update.message.reply_text("Введите ваше *Имя*:", parse_mode="Markdown")
 
 init_db()
+from telegram import ReplyKeyboardMarkup
+
+def show_main_menu(update, context):
+    keyboard = [
+        ["🟢 Anmeldung (Начать смену)"],
+        ["🔴 Abmeldung (Завершить смену)"]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
+
 # database.py
 import sqlite3
 def handle_text(update, context):
