@@ -9,6 +9,14 @@ from database import init_db
 from database import user_exists, add_user
 dp.add_handler(CommandHandler("start", start))
 dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text))
+updater = Updater(TOKEN, use_context=True)
+dp = updater.dispatcher
+
+dp.add_handler(CommandHandler("start", start))
+dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text))
+
+updater.start_polling()
+updater.idle()
 
 def start(update, context):
     user = update.effective_user
