@@ -4,6 +4,7 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from datetime import datetime
 import sqlite3
 from database import init_db
+from database import user_exists, add_user
 
 init_db()
 # database.py
