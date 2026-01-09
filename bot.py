@@ -5,6 +5,17 @@ from datetime import datetime
 import sqlite3
 from database import init_db
 from database import user_exists, add_user
+def start(update, context):
+    user = update.effective_user
+
+    if user_exists(user.id):
+        update.message.reply_text(
+            "✅ Вы уже зарегистрированы.\nВыберите действие:"
+        )
+        show_main_menu(update, context)
+    else:
+        context.user_data["state"] = "WAIT_FIRSTNAME"
+        update.message.reply_text("Введите ваше *Имя*:", parse_mode="Markdown")
 
 init_db()
 # database.py
