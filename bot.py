@@ -1,10 +1,14 @@
+import os
 import sqlite3
 from datetime import datetime
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # ====== Настройки ======
-TOKEN = "ВАШ_ТОКЕН"  # <- Вставьте сюда свой токен
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+if not TOKEN:
+    raise ValueError("⚠️ Токен не найден! Установите переменную окружения TELEGRAM_BOT_TOKEN")
+
 DB_NAME = "bollwerk.db"
 
 # ====== Работа с базой ======
@@ -24,14 +28,6 @@ def init_db():
         registered_at TEXT
     )
     """)
-import os
-from telegram.ext import Updater
-
-TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-if not TOKEN:
-    raise ValueError("⚠️ Токен не найден! Установите TELEGRAM_BOT_TOKEN")
-
-updater = Updater(TOKEN, use_context=True)
 
     # Таблица смен
     cursor.execute("""
@@ -83,7 +79,6 @@ def start_shift(user_id, task=None):
 def end_shift(user_id):
     conn = get_connection()
     cursor = conn.cursor()
-    # Находим последнюю активную смену
     cursor.execute(
         "SELECT id FROM shifts WHERE user_id=? AND active=1 ORDER BY start_time DESC LIMIT 1",
         (user_id,)
