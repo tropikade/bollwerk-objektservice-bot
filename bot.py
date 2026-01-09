@@ -198,3 +198,12 @@ async def admin_logs(message: types.Message):
 
 if __name__ == "__main__":
     executor.start_polling(dp)
+from telegram.ext import Updater
+
+updater = Updater(TOKEN, use_context=True)
+dp = updater.dispatcher
+
+# handlers где-то тут
+
+updater.start_polling()
+updater.idle()
