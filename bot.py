@@ -1,4 +1,6 @@
 from database import init_db
+init_db()
+
 from telegram.ext import CommandHandler, MessageHandler, Filters
 dp = updater.dispatcher
 from aiogram import Bot, Dispatcher, executor, types
