@@ -7,6 +7,9 @@ from datetime import datetime
 import sqlite3
 from database import init_db
 from database import user_exists, add_user
+dp.add_handler(CommandHandler("start", start))
+dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text))
+
 def start(update, context):
     user = update.effective_user
 
