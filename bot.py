@@ -1,7 +1,7 @@
 import os
 import sqlite3
 from datetime import datetime
-from telegram import ReplyKeyboardMarkup, Update
+from telegram import ReplyKeyboardMarkup, KeyboardButton, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # ====== Настройки ======
@@ -19,7 +19,6 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
     
-    # Таблица пользователей
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
@@ -28,8 +27,7 @@ def init_db():
         registered_at TEXT
     )
     """)
-
-    # Таблица смен
+    
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS shifts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,7 +42,6 @@ def init_db():
         active INTEGER DEFAULT 1
     )
     """)
-
     conn.commit()
     conn.close()
 
@@ -66,17 +63,17 @@ def add_user(user_id, first_name, last_name):
     conn.commit()
     conn.close()
 
-def start_shift(user_id, task=None):
+def start_shift(user_id, task, lat, lon):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO shifts (user_id, start_time, task) VALUES (?, ?, ?)",
-        (user_id, datetime.now().isoformat(), task)
+        "INSERT INTO shifts (user_id, start_time, start_lat, start_lon, task) VALUES (?, ?, ?, ?, ?)",
+        (user_id, datetime.now().isoformat(), lat, lon, task)
     )
     conn.commit()
     conn.close()
 
-def end_shift(user_id):
+def end_shift(user_id, lat, lon):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -87,14 +84,14 @@ def end_shift(user_id):
     if row:
         shift_id = row[0]
         cursor.execute(
-            "UPDATE shifts SET end_time=?, active=0 WHERE id=?",
-            (datetime.now().isoformat(), shift_id)
+            "UPDATE shifts SET end_time=?, end_lat=?, end_lon=?, active=0 WHERE id=?",
+            (datetime.now().isoformat(), lat, lon, shift_id)
         )
     conn.commit()
     conn.close()
 
 # ====== Бот ======
-user_states = {}  # Временные состояния пользователя
+user_states = {}  # Временные состояния
 
 def start(update: Update, context: CallbackContext):
     user = update.effective_user
@@ -126,7 +123,7 @@ def handle_text(update: Update, context: CallbackContext):
             show_main_menu(update)
             return
 
-    # Обработка кнопок Hauptmenü
+    # Главное меню Anmeldung / Abmeldung
     if text in ["🟢 Anmeldung", "🔴 Abmeldung"]:
         user_states[user_id] = {"state": "WAIT_TASK", "action": text}
         keyboard = ReplyKeyboardMarkup(
@@ -137,20 +134,37 @@ def handle_text(update: Update, context: CallbackContext):
 
     # Выбор направления перед сменой
     if user_id in user_states and user_states[user_id]["state"] == "WAIT_TASK":
-        task = text
-        action = user_states[user_id]["action"]
-        if action == "🟢 Anmeldung":
-            start_shift(user_id, task=task)
-            update.message.reply_text(f"✅ Смена началась! Направление: {task}")
-        elif action == "🔴 Abmeldung":
-            end_shift(user_id)
-            update.message.reply_text(f"✅ Смена завершена! Направление: {task}")
-        del user_states[user_id]
-        show_main_menu(update)
+        user_states[user_id]["task"] = text
+        user_states[user_id]["state"] = "WAIT_LOCATION"
+        keyboard = ReplyKeyboardMarkup(
+            [[KeyboardButton("Отправить геолокацию 📍", request_location=True)]],
+            resize_keyboard=True, one_time_keyboard=True
+        )
+        update.message.reply_text("Отправьте вашу геолокацию:", reply_markup=keyboard)
         return
 
-    # Если ничего не подошло
     update.message.reply_text("Пожалуйста, используйте кнопки меню.")
+
+def handle_location(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    if user_id not in user_states or user_states[user_id]["state"] != "WAIT_LOCATION":
+        update.message.reply_text("Пожалуйста, начните смену через главное меню.")
+        return
+
+    lat = update.message.location.latitude
+    lon = update.message.location.longitude
+    task = user_states[user_id]["task"]
+    action = user_states[user_id]["action"]
+
+    if action == "🟢 Anmeldung":
+        start_shift(user_id, task, lat, lon)
+        update.message.reply_text(f"✅ Смена началась! Направление: {task}")
+    elif action == "🔴 Abmeldung":
+        end_shift(user_id, lat, lon)
+        update.message.reply_text(f"✅ Смена завершена! Направление: {task}")
+
+    del user_states[user_id]
+    show_main_menu(update)
 
 def show_main_menu(update: Update):
     keyboard = ReplyKeyboardMarkup([["🟢 Anmeldung", "🔴 Abmeldung"]], resize_keyboard=True)
@@ -161,8 +175,11 @@ def main():
     init_db()
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
+
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text))
+    dp.add_handler(MessageHandler(Filters.location, handle_location))
+
     updater.start_polling()
     updater.idle()
 
