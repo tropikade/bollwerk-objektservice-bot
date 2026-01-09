@@ -20,6 +20,32 @@ def start(update, context):
 init_db()
 # database.py
 import sqlite3
+def handle_text(update, context):
+    state = context.user_data.get("state")
+    text = update.message.text.strip()
+
+    if state == "WAIT_FIRSTNAME":
+        context.user_data["first_name"] = text
+        context.user_data["state"] = "WAIT_LASTNAME"
+        update.message.reply_text("Введите вашу *Фамилию*:", parse_mode="Markdown")
+        return
+
+    if state == "WAIT_LASTNAME":
+        first_name = context.user_data.get("first_name")
+        last_name = text
+        user_id = update.effective_user.id
+
+        add_user(user_id, first_name, last_name)
+
+        context.user_data.clear()
+
+        update.message.reply_text(
+            f"✅ Регистрация завершена!\n"
+            f"{first_name} {last_name}\n\n"
+            f"Теперь вы можете начать смену."
+        )
+        show_main_menu(update, context)
+        return
 
 DB_NAME = "bollwerk.db"
 
