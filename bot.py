@@ -3,6 +3,9 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from datetime import datetime
 import sqlite3
+from database import init_db
+
+init_db()
 
 BOT_TOKEN = "ВАШ_ТОКЕН"
 
