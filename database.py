@@ -1,4 +1,25 @@
 # database.py
+from datetime import datetime
+
+def user_exists(user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result is not None
+
+
+def add_user(user_id, first_name, last_name):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO users (user_id, first_name, last_name, registered_at)
+        VALUES (?, ?, ?, ?)
+    """, (user_id, first_name, last_name, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
 import sqlite3
 
 DB_NAME = "bollwerk.db"
