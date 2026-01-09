@@ -24,6 +24,14 @@ def init_db():
         registered_at TEXT
     )
     """)
+import os
+from telegram.ext import Updater
+
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+if not TOKEN:
+    raise ValueError("⚠️ Токен не найден! Установите TELEGRAM_BOT_TOKEN")
+
+updater = Updater(TOKEN, use_context=True)
 
     # Таблица смен
     cursor.execute("""
