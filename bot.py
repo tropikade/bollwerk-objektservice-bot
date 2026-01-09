@@ -2,7 +2,7 @@ from database import init_db
 init_db()
 
 from telegram.ext import CommandHandler, MessageHandler, Filters
-dp = updater.dispatcher
+
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -223,3 +223,4 @@ dp = updater.dispatcher
 
 updater.start_polling()
 updater.idle()
+dp = updater.dispatcher
