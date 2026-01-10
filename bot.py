@@ -1,9 +1,5 @@
 import os
-from telegram import (
-    Update,
-    ReplyKeyboardMarkup,
-    KeyboardButton
-)
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -13,26 +9,22 @@ from telegram.ext import (
 )
 
 from database import init_db, user_exists, add_user
+
 # ================== СПИСОК АДМИНИСТРАТОРОВ ==================
-# Здесь указываем Telegram user_id администраторов
 ADMIN_IDS = [
     372822825,  # Админ 1
-    ,  # Админ 2
+      # Админ 2
        # Админ 3
 ]
 
-
 # ================== НАСТРОЙКИ ==================
-
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
     raise RuntimeError("TELEGRAM_BOT_TOKEN не задан")
 
 init_db()
 
-
 # ================== СОСТОЯНИЯ ==================
-
 ASK_LANGUAGE = 0
 ASK_FIRSTNAME = 1
 ASK_LASTNAME = 2
@@ -40,9 +32,7 @@ ASK_TASK = 3
 ASK_START_LOCATION = 4
 ASK_END_LOCATION = 5
 
-
 # ================== КЛАВИАТУРЫ ==================
-
 LANG_MENU = ReplyKeyboardMarkup(
     [["Deutsch 🇩🇪", "Русский 🇷🇺"]],
     resize_keyboard=True,
@@ -69,9 +59,16 @@ LOCATION_BUTTON = ReplyKeyboardMarkup(
     one_time_keyboard=True
 )
 
+# ================== ФУНКЦИИ ==================
+async def notify_admins(app, text):
+    """Отправка уведомления всем администраторам"""
+    for admin_id in ADMIN_IDS:
+        try:
+            await app.bot.send_message(chat_id=admin_id, text=text)
+        except Exception as e:
+            print(f"Ошибка при уведомлении {admin_id}: {e}")
 
 # ================== /start ==================
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text(
@@ -80,18 +77,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     context.user_data["state"] = ASK_LANGUAGE
 
-
 # ================== ТЕКСТ ==================
-
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     state = context.user_data.get("state")
+    user_id = update.effective_user.id
+    user_name = update.effective_user.full_name
 
     # --- ВЫБОР ЯЗЫКА ---
     if state == ASK_LANGUAGE:
         context.user_data["lang"] = "de" if "Deutsch" in text else "ru"
 
-        if user_exists(update.effective_user.id):
+        if user_exists(user_id):
             await update.message.reply_text(
                 "Sie sind bereits registriert ✅",
                 reply_markup=MAIN_MENU
@@ -112,7 +109,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if state == ASK_LASTNAME:
         add_user(
-            update.effective_user.id,
+            user_id,
             context.user_data["first_name"],
             text
         )
@@ -155,16 +152,24 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=MAIN_MENU
     )
 
-
 # ================== ГЕОЛОКАЦИЯ ==================
-
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    loc = update.message.location
     state = context.user_data.get("state")
+    user_id = update.effective_user.id
+    user_name = update.effective_user.full_name
+    task = context.user_data.get("task", "-")
+    lat, lon = (loc.latitude, loc.longitude) if loc else ("-", "-")
 
     if state == ASK_START_LOCATION:
         await update.message.reply_text(
             "Смена начата ✅",
             reply_markup=MAIN_MENU
+        )
+        # Уведомляем админов
+        await notify_admins(
+            context.application,
+            f"🟢 Anmeldung\n{user_name}\nНаправление: {task}\n📍 {lat}, {lon}"
         )
         context.user_data.clear()
         return
@@ -174,12 +179,15 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Смена завершена ✅",
             reply_markup=MAIN_MENU
         )
+        # Уведомляем админов
+        await notify_admins(
+            context.application,
+            f"🔴 Abmeldung\n{user_name}\n📍 {lat}, {lon}"
+        )
         context.user_data.clear()
         return
 
-
 # ================== ЗАПУСК ==================
-
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
