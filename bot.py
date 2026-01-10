@@ -1,4 +1,9 @@
 import os
+
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+if not TOKEN:
+    raise RuntimeError("TELEGRAM_BOT_TOKEN не задан")
 import sqlite3
 from datetime import datetime
 from telegram import ReplyKeyboardMarkup, KeyboardButton, Update
