@@ -13,7 +13,7 @@ from database import init_db
 init_db()
 from dotenv import load_dotenv
 load_dotenv()
-
+application = ApplicationBuilder().token(TOKEN).build()
 # ====== Настройки ======
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
