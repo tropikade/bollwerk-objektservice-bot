@@ -9,7 +9,7 @@ from telegram.ext import (
 )
 
 from database import init_db, user_exists, add_user
-
+from telegram import ReplyKeyboardMarkup, KeyboardButton
 # --- ИНИЦИАЛИЗАЦИЯ ---
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
