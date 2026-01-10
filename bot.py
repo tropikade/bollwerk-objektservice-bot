@@ -1,11 +1,11 @@
 import os
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
     ContextTypes,
-    filters
+    filters,
 )
 
 from database import init_db, user_exists, add_user
@@ -22,7 +22,6 @@ ASK_FIRSTNAME = 1
 ASK_LASTNAME = 2
 
 
-# --- /start ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
@@ -34,7 +33,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["state"] = ASK_FIRSTNAME
 
 
-# --- ОБРАБОТКА ТЕКСТА ---
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     state = context.user_data.get("state")
 
@@ -56,14 +54,13 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Напишите /start")
 
 
-# --- ЗАПУСК ---
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 
-    print("Бот запущен")
+    print("✅ Бот запущен")
     app.run_polling()
 
 
