@@ -48,6 +48,9 @@ LOCATION_BUTTON = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=True
 )
+ASK_TASK = 3
+ASK_START_LOCATION = 4
+ASK_END_LOCATION = 5
 
 # --- ИНИЦИАЛИЗАЦИЯ ---
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
