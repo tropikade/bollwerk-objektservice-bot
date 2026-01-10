@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     ApplicationBuilder,
@@ -18,7 +18,7 @@ if not TOKEN:
 # Список администраторов (Telegram user_id)
 ADMIN_IDS = [
     372822825,  # Админ 1
-    #  Добавьте других админов
+    # Добавьте других админов
 ]
 
 # ================== КЛАВИАТУРЫ ==================
@@ -29,7 +29,7 @@ LANG_MENU = ReplyKeyboardMarkup(
 )
 
 MAIN_MENU = ReplyKeyboardMarkup(
-    [["Anmeldung"], ["Abmeldung"], ["🌐 Sprache ändern"]],
+    [["Anmeldung"], ["Abmeldung"]],
     resize_keyboard=True
 )
 
@@ -130,16 +130,24 @@ def fetch_history(limit=50):
     conn.close()
     return rows
 
-def calculate_hours(user_id):
-    """Считает суммарное время отработанных часов для пользователя"""
+def calculate_hours(user_id, start_date=None):
+    """Считает суммарное время отработанных часов для пользователя с optional start_date"""
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("""
-        SELECT event, timestamp
-        FROM shifts
-        WHERE user_id=?
-        ORDER BY timestamp
-    """, (user_id,))
+    if start_date:
+        c.execute("""
+            SELECT event, timestamp
+            FROM shifts
+            WHERE user_id=? AND timestamp >= ?
+            ORDER BY timestamp
+        """, (user_id, start_date.isoformat()))
+    else:
+        c.execute("""
+            SELECT event, timestamp
+            FROM shifts
+            WHERE user_id=?
+            ORDER BY timestamp
+        """, (user_id,))
     rows = c.fetchall()
     conn.close()
     total_seconds = 0
@@ -241,9 +249,13 @@ def get_text(lang, key):
 
 # ================== /start ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     context.user_data.clear()
-    await update.message.reply_text(get_text("de", "choose_language"), reply_markup=LANG_MENU)
-    context.user_data["state"] = ASK_LANGUAGE
+    if not user_exists(user_id):
+        await update.message.reply_text(get_text("de", "choose_language"), reply_markup=LANG_MENU)
+        context.user_data["state"] = ASK_LANGUAGE
+    else:
+        await update.message.reply_text(get_text("de", "already_registered"), reply_markup=MAIN_MENU)
 
 # ================== TEXT HANDLER ==================
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -253,27 +265,16 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.full_name
     lang = context.user_data.get("lang", "de")
 
-    # --- ЯЗЫК ---
-    if text in ["Deutsch 🇩🇪", "Русский 🇷🇺", "English 🇬🇧", "🌐 Sprache ändern"]:
+    # --- ЯЗЫК ТОЛЬКО ПРИ РЕГИСТРАЦИИ ---
+    if state == ASK_LANGUAGE:
         if text == "Deutsch 🇩🇪":
             context.user_data["lang"] = "de"
         elif text == "Русский 🇷🇺":
             context.user_data["lang"] = "ru"
         elif text == "English 🇬🇧":
             context.user_data["lang"] = "en"
-        lang = context.user_data["lang"]
-        await update.message.reply_text(get_text(lang, "choose_language"), reply_markup=LANG_MENU)
-        context.user_data["state"] = ASK_LANGUAGE
-        return
-
-    # --- Выбор языка при старте ---
-    if state == ASK_LANGUAGE:
-        if user_exists(user_id):
-            await update.message.reply_text(get_text(lang, "already_registered"), reply_markup=MAIN_MENU)
-            context.user_data.clear()
-            return
-        await update.message.reply_text(get_text(lang, "choose_name"))
         context.user_data["state"] = ASK_FIRSTNAME
+        await update.message.reply_text(get_text(context.user_data["lang"], "choose_name"))
         return
 
     # --- Регистрация ---
@@ -378,6 +379,32 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"{dt} | {event} | {name} | {task} | 📍 {lat},{lon} | ⏱ {hours} h\n"
     await update.message.reply_text(msg)
 
+# ================== /weekly_hours ==================
+async def weekly_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    lang = "de"
+    if not is_admin(user_id):
+        await update.message.reply_text(get_text(lang, "not_admin"))
+        return
+
+    start_week = datetime.now() - timedelta(days=datetime.now().weekday())  # Пн этой недели
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT DISTINCT user_id, name FROM shifts")
+    users = c.fetchall()
+    conn.close()
+
+    if not users:
+        await update.message.reply_text("Keine Stunden für diese Woche.")
+        return
+
+    msg = "⏱ Stunden diese Woche:\n"
+    for u_id, name in users:
+        hours = calculate_hours(u_id, start_date=start_week)
+        msg += f"👤 {name} | {hours} h\n"
+
+    await update.message.reply_text(msg)
+
 # ================== /reset_users ==================
 async def reset_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -415,6 +442,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("history", history))
+    app.add_handler(CommandHandler("weekly_hours", weekly_hours))
     app.add_handler(CommandHandler("reset_users", reset_users))
     app.add_handler(MessageHandler(filters.LOCATION, location_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
