@@ -14,7 +14,6 @@ from database import init_db, user_exists, add_user
 ADMIN_IDS = [
     372822825,  # Админ 1
       # Админ 2
-       # Админ 3
 ]
 
 # ================== НАСТРОЙКИ ==================
@@ -31,6 +30,10 @@ ASK_LASTNAME = 2
 ASK_TASK = 3
 ASK_START_LOCATION = 4
 ASK_END_LOCATION = 5
+
+# ================== АКТИВНЫЕ СМЕНЫ ==================
+# user_id: { 'name': str, 'task': str, 'start': (lat, lon) }
+active_shifts = {}
 
 # ================== КЛАВИАТУРЫ ==================
 LANG_MENU = ReplyKeyboardMarkup(
@@ -67,6 +70,9 @@ async def notify_admins(app, text):
             await app.bot.send_message(chat_id=admin_id, text=text)
         except Exception as e:
             print(f"Ошибка при уведомлении {admin_id}: {e}")
+
+def is_admin(user_id):
+    return user_id in ADMIN_IDS
 
 # ================== /start ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -166,6 +172,8 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Смена начата ✅",
             reply_markup=MAIN_MENU
         )
+        # Добавляем в активные смены
+        active_shifts[user_id] = {"name": user_name, "task": task, "start": (lat, lon)}
         # Уведомляем админов
         await notify_admins(
             context.application,
@@ -184,14 +192,37 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.application,
             f"🔴 Abmeldung\n{user_name}\n📍 {lat}, {lon}"
         )
+        # Удаляем из активных смен
+        if user_id in active_shifts:
+            del active_shifts[user_id]
         context.user_data.clear()
         return
+
+# ================== КОМАНДА /STATUS ==================
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет прав администратора")
+        return
+
+    if not active_shifts:
+        await update.message.reply_text("Никто не находится на смене.")
+        return
+
+    msg = "📋 Текущие смены:\n"
+    for u_id, info in active_shifts.items():
+        task = info.get("task", "-")
+        lat, lon = info.get("start", ("-", "-"))
+        msg += f"👤 {info['name']}, Направление: {task}, 📍 {lat}, {lon}\n"
+
+    await update.message.reply_text(msg)
 
 # ================== ЗАПУСК ==================
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("status", status))
     app.add_handler(MessageHandler(filters.LOCATION, location_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 
