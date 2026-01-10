@@ -29,6 +29,25 @@ LOCATION_BUTTON = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=True
 )
+MAIN_MENU = ReplyKeyboardMarkup(
+    [["Anmeldung"], ["Abmeldung"]],
+    resize_keyboard=True
+)
+
+TASK_MENU = ReplyKeyboardMarkup(
+    [
+        ["Garten", "Sport Training"],
+        ["Reinigung"]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+
+LOCATION_BUTTON = ReplyKeyboardMarkup(
+    [[KeyboardButton("📍 Standort senden", request_location=True)]],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
 
 # --- ИНИЦИАЛИЗАЦИЯ ---
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
