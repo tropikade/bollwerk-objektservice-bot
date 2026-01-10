@@ -6,6 +6,10 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from database import init_db
 
 init_db()
+from dotenv import load_dotenv
+load_dotenv()
+from config import TOKEN
+
 # ====== Настройки ======
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
