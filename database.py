@@ -1,37 +1,18 @@
-# database.py
+import sqlite3
 from datetime import datetime
 
-def user_exists(user_id):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
-    result = cursor.fetchone()
-    conn.close()
-    return result is not None
-
-
-def add_user(user_id, first_name, last_name):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO users (user_id, first_name, last_name, registered_at)
-        VALUES (?, ?, ?, ?)
-    """, (user_id, first_name, last_name, datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-
-import sqlite3
-
 DB_NAME = "bollwerk.db"
+
 
 def get_connection():
     return sqlite3.connect(DB_NAME)
 
+
 def init_db():
     conn = get_connection()
-    cursor = conn.cursor()
+    cur = conn.cursor()
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
         first_name TEXT NOT NULL,
@@ -40,10 +21,10 @@ def init_db():
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS shifts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
+        user_id INTEGER,
         start_time TEXT,
         end_time TEXT,
         start_lat REAL,
@@ -51,10 +32,29 @@ def init_db():
         end_lat REAL,
         end_lon REAL,
         task TEXT,
-        active INTEGER DEFAULT 1,
-        FOREIGN KEY(user_id) REFERENCES users(user_id)
+        active INTEGER DEFAULT 1
     )
     """)
 
+    conn.commit()
+    conn.close()
+
+
+def user_exists(user_id: int) -> bool:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
+    result = cur.fetchone()
+    conn.close()
+    return result is not None
+
+
+def add_user(user_id: int, first_name: str, last_name: str):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO users VALUES (?, ?, ?, ?)",
+        (user_id, first_name, last_name, datetime.now().isoformat())
+    )
     conn.commit()
     conn.close()
